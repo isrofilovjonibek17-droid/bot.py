@@ -5,22 +5,21 @@ import os
 import threading
 from flask import Flask
 
-# --- RENDER PORT XATOSINI OLDINI OLISH ---
+# Render uchun server
 app = Flask('')
 @app.route('/')
-def home(): return "Bot is active!"
+def home(): return "Bot is running!"
 def run(): app.run(host='0.0.0.0', port=8080)
 threading.Thread(target=run).start()
 
-# --- SOZLAMALAR ---
-# Tokenni boshqa joydan ko'chirmang, aynan shu qatordagidan foydalaning
-TOKEN = '8219536583:AAHXIWn25jSv5JdkMLSEIlw2b6_bxAC8fsA' 
+# SOZLAMALAR
+TOKEN = '8219536583:AAHXIWn25jSv5JdkMLSEIlw2b6_bxAC8fsA'
 YOUTUBE_API_KEY = 'AIzaSyCnfj-ygi6RfWfmJ2T0ozKgA-WQ3hv9gz8'
 bot = telebot.TeleBot(TOKEN)
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "🎵 Musiqa nomini yozing, men darhol yuklab beraman!")
+    bot.send_message(message.chat.id, "🎵 Musiqa nomini yozing, men yuklab beraman!")
 
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
@@ -29,23 +28,23 @@ def handle_message(message):
 
     def download_process():
         try:
-            # YouTube qidiruv
-            s_url = "https://www.googleapis.com/youtube/v3/search"
+            # 1. YouTube'dan qidirish
+            search_url = "https://www.googleapis.com/youtube/v3/search"
             params = {'part': 'snippet', 'q': query, 'key': YOUTUBE_API_KEY, 'maxResults': 1, 'type': 'video'}
-            data = requests.get(s_url, params=params).json()
+            r = requests.get(search_url, params=params).json()
             
-            if 'items' not in data or not data['items']:
+            if 'items' not in r or not r['items']:
                 bot.edit_message_text("😕 Topilmadi.", message.chat.id, msg.message_id)
                 return
 
-            v_id = data['items'][0]['id']['videoId']
+            v_id = r['items'][0]['id']['videoId']
             url = f"https://www.youtube.com/watch?v={v_id}"
             
-            # Yuklash
-            u_id = str(threading.get_ident())
+            # 2. Yuklash sozlamalari
+            file_name = f"music_{message.chat.id}"
             ydl_opts = {
                 'format': 'bestaudio/best',
-                'outtmpl': u_id,
+                'outtmpl': file_name,
                 'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '128'}],
                 'quiet': True,
             }
@@ -53,20 +52,20 @@ def handle_message(message):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
             
-            f_name = f"{u_id}.mp3"
-            if os.path.exists(f_name):
-                with open(f_name, 'rb') as audio:
+            # 3. Yuborish
+            full_name = f"{file_name}.mp3"
+            if os.path.exists(full_name):
+                with open(full_name, 'rb') as audio:
                     bot.send_audio(message.chat.id, audio, caption="✅ @sammusiqalar")
-                os.remove(f_name)
+                os.remove(full_name)
                 bot.delete_message(message.chat.id, msg.message_id)
             else:
-                bot.edit_message_text("❌ MP3 xatosi.", message.chat.id, msg.message_id)
-        except Exception:
-            bot.send_message(message.chat.id, "⚠️ Xato. Iltimos qaytadan urinib ko'ring.")
+                bot.edit_message_text("❌ FFmpeg xatosi! Render Settings-da Build Command-ni tekshiring.", message.chat.id, msg.message_id)
+        
+        except Exception as e:
+            bot.send_message(message.chat.id, f"⚠️ Xato: {str(e)[:50]}")
 
     threading.Thread(target=download_process).start()
 
-# Eng muhimi: Eski ulanishlarni o'chirib, yangidan polling boshlash
-if __name__ == "__main__":
-    bot.remove_webhook()
-    bot.polling(none_stop=True, skip_pending=True)
+bot.remove_webhook()
+bot.polling(none_stop=True)
