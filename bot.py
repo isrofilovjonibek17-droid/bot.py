@@ -2,7 +2,6 @@ import telebot, yt_dlp, os, threading, requests
 from flask import Flask
 from static_ffmpeg import add_paths
 
-# FFmpeg yo'lini qo'shish
 add_paths()
 
 app = Flask('')
@@ -19,23 +18,41 @@ bot = telebot.TeleBot(TOKEN)
 def download(message):
     msg = bot.send_message(message.chat.id, "📥 **Qidirilmoqda...**")
     try:
-        r = requests.get(f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={message.text}&key={YOUTUBE_API_KEY}&maxResults=1&type=video").json()
+        # YouTube API orqali qidirish
+        search_url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={message.text}&key={YOUTUBE_API_KEY}&maxResults=1&type=video"
+        r = requests.get(search_url).json()
+        
+        if 'items' not in r or not r['items']:
+            bot.edit_message_text("😕 Hech narsa topilmadi.", message.chat.id, msg.message_id)
+            return
+
         v_id = r['items'][0]['id']['videoId']
         url = f"https://www.youtube.com/watch?v={v_id}"
         u_id = str(message.chat.id)
+        
+        # BLOKDAN O'TISH UCHUN SOZLAMALAR
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': u_id,
             'postprocessors': [{'key': 'FFmpegExtractAudio','preferredcodec': 'mp3','preferredquality': '128'}],
+            'quiet': True,
+            'no_warnings': True,
+            'source_address': '0.0.0.0', # IPv4 ishlatish
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
+        
         with open(f"{u_id}.mp3", 'rb') as audio:
             bot.send_audio(message.chat.id, audio, caption="✅ @sammusiqalar")
+        
         os.remove(f"{u_id}.mp3")
         bot.delete_message(message.chat.id, msg.message_id)
+        
     except Exception as e:
-        bot.edit_message_text(f"⚠️ Xato: {str(e)}", message.chat.id, msg.message_id)
+        bot.edit_message_text(f"⚠️ Xatolik! Iltimos, boshqa nom yozib ko'ring.", message.chat.id, msg.message_id)
+        print(f"Error: {e}")
 
 bot.remove_webhook()
 bot.polling(none_stop=True)
