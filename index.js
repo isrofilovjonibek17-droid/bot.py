@@ -4,11 +4,13 @@ const ytdl = require('ytdl-core');
 const express = require('express');
 const fs = require('fs');
 
+// Render uchun server
 const app = express();
 app.get('/', (req, res) => res.send('Bot ishlayapti!'));
 app.listen(process.env.PORT || 8080);
 
-const bot = new Telegraf('8219536583:AAHXIWn25jSv5JdkMLSEIlw2b6_bxAC8fsA');
+// YANGI TOKEN SHU YERDA:
+const bot = new Telegraf('8219536583:AAEOacmJ-EeP0ryMZuaPMJSocQRUzHwJofQ');
 
 bot.start((ctx) => ctx.reply('🎵 Musiqa nomini yozing, men uni yuklab beraman!'));
 
@@ -35,7 +37,7 @@ bot.on('text', async (ctx) => {
             });
 
     } catch (e) {
-        ctx.reply('⚠️ Xatolik! Iltimos, qaytadan urinib ko\'ring.');
+        ctx.reply('⚠️ Xatolik! Iltimos, boshqa nom yozib ko\'ring.');
     }
 });
 
