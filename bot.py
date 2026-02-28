@@ -5,7 +5,7 @@ import os
 import threading
 from flask import Flask
 
-# --- RENDER UCHUN KICHIK SERVER ---
+# --- RENDER PORT XATOSI UCHUN KICHIK SERVER ---
 app = Flask('')
 @app.route('/')
 def home(): return "Bot is alive!"
@@ -27,7 +27,7 @@ def is_subscribed(user_id):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "🎵 **Musiqa nomini yozing yoki link yuboring!**\n\nMen uni darhol yuklab beraman.", parse_mode='Markdown')
+    bot.send_message(message.chat.id, "🎵 **Musiqa nomini yozing yoki link yuboring!**\n\nMen srazu yuklab beraman.", parse_mode='Markdown')
 
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
@@ -38,13 +38,12 @@ def handle_message(message):
     query = message.text
     msg = bot.send_message(message.chat.id, "📥 **Tayyorlanmoqda...**", parse_mode='Markdown')
 
-    def download_process():
+    def download_job():
         try:
             url = ""
             if "http" in query:
                 url = query
             else:
-                # YouTube'dan birinchi videoni topish
                 search_url = "https://www.googleapis.com/youtube/v3/search"
                 params = {'part': 'snippet', 'q': query, 'key': YOUTUBE_API_KEY, 'maxResults': 1, 'type': 'video'}
                 data = requests.get(search_url, params=params).json()
@@ -55,7 +54,6 @@ def handle_message(message):
                     bot.edit_message_text("😕 Topilmadi.", message.chat.id, msg.message_id)
                     return
 
-            # Yuklash sozlamalari
             u_id = str(threading.get_ident())
             ydl_opts = {
                 'format': 'bestaudio/best',
@@ -68,17 +66,17 @@ def handle_message(message):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
             
-            f_name = f"{u_id}.mp3"
-            if os.path.exists(f_name):
-                with open(f_name, 'rb') as audio:
-                    bot.send_audio(message.chat.id, audio, caption="✅ @sammusiqalar orqali yuklandi")
-                os.remove(f_name)
+            f_path = f"{u_id}.mp3"
+            if os.path.exists(f_path):
+                with open(f_path, 'rb') as audio:
+                    bot.send_audio(message.chat.id, audio, caption="✅ @sammusiqalar")
+                os.remove(f_path)
                 bot.delete_message(message.chat.id, msg.message_id)
             else:
-                bot.edit_message_text("❌ Yuklashda xato bo'ldi.", message.chat.id, msg.message_id)
+                bot.edit_message_text("❌ Yuklashda xato.", message.chat.id, msg.message_id)
         except Exception as e:
-            bot.send_message(message.chat.id, "❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
+            bot.send_message(message.chat.id, "❌ Xatolik yuz berdi. Boshqa nom yozing.")
 
-    threading.Thread(target=download_process).start()
+    threading.Thread(target=download_job).start()
 
 bot.polling(none_stop=True)
