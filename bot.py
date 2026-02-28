@@ -5,16 +5,16 @@ import os
 import threading
 from flask import Flask
 
-# --- RENDER UCHUN KICHIK SERVER ---
+# --- RENDER UCHUN KICHIK SERVER (PORT MUAMMOSINI HAL QILISH) ---
 app = Flask('')
 @app.route('/')
-def home(): return "Bot is alive!"
+def home(): return "Bot is running!"
 def run(): app.run(host='0.0.0.0', port=8080)
 threading.Thread(target=run).start()
 
 # --- SOZLAMALAR ---
 # Yangi tokeningizni shu yerga joyladim
-TOKEN = '8219536583:AAFarvK-7nI4_tYMjTcr9rZ16VeoY713ALk'
+TOKEN = '8219536583:AAHXIWn25jSv5JdkMLSEIlw2b6_bxAC8fsA'
 YOUTUBE_API_KEY = 'AIzaSyCnfj-ygi6RfWfmJ2T0ozKgA-WQ3hv9gz8'
 KANAL_ID = '@sammusiqalar' 
 bot = telebot.TeleBot(TOKEN)
@@ -28,7 +28,7 @@ def is_subscribed(user_id):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "🎵 **Musiqa nomini yozing yoki link yuboring!**\n\nMen srazu yuklab beraman.", parse_mode='Markdown')
+    bot.send_message(message.chat.id, "🎵 **Musiqa nomini yozing yoki YouTube link yuboring!**\n\nMen uni srazu MP3 qilib beraman.", parse_mode='Markdown')
 
 @bot.message_handler(func=lambda m: True)
 def handle_message(message):
@@ -53,10 +53,10 @@ def handle_message(message):
                     v_id = data['items'][0]['id']['videoId']
                     url = f"https://www.youtube.com/watch?v={v_id}"
                 else:
-                    bot.edit_message_text("😕 Topilmadi.", message.chat.id, msg.message_id)
+                    bot.edit_message_text("😕 Hech narsa topilmadi.", message.chat.id, msg.message_id)
                     return
 
-            # Yuklash sozlamalari
+            # Yuklash sozlamalari (Render uchun yengil formatda)
             u_id = str(threading.get_ident())
             ydl_opts = {
                 'format': 'bestaudio/best',
@@ -76,12 +76,13 @@ def handle_message(message):
                 os.remove(f_name)
                 bot.delete_message(message.chat.id, msg.message_id)
             else:
-                bot.edit_message_text("❌ MP3 tayyorlashda xato.", message.chat.id, msg.message_id)
+                bot.edit_message_text("❌ MP3 tayyorlashda xato bo'ldi.", message.chat.id, msg.message_id)
         except Exception as e:
-            bot.send_message(message.chat.id, "❌ Xatolik yuz berdi. Boshqa nom yozib ko'ring.")
+            bot.send_message(message.chat.id, "⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
 
+    # Alohida oqimda ishga tushirish
     threading.Thread(target=download_process).start()
 
-# Eski ulanishlarni tozalash
+# Eski ulanishlarni tozalab, pollingni boshlash
 bot.remove_webhook()
 bot.polling(none_stop=True, skip_pending=True)
