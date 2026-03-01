@@ -1,2 +1,4 @@
-fastapi
-uvicorn
+aiogram
+yt-dlp
+youtube-search
+flask
