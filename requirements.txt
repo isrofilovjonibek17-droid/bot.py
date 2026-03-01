@@ -1,4 +1,4 @@
 aiogram
 yt-dlp
-youtube-search-python
+youtube-search
 flask
