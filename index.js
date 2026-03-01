@@ -1,50 +1,78 @@
-const { Telegraf } = require('telegraf');
-const axios = require('axios');
-const express = require('express');
+const { Telegraf } = require("telegraf");
+const yts = require("yt-search");
+const ytdl = require("ytdl-core");
+const ffmpeg = require("fluent-ffmpeg");
+const ffmpegPath = require("ffmpeg-static");
+const fs = require("fs");
+const express = require("express");
 
+// Render yoki Railway-da bot o'chib qolmasligi uchun kichik server
 const app = express();
-app.get('/', (req, res) => res.send('Bot is Live!'));
+app.get('/', (req, res) => res.send('Bot is Running!'));
 app.listen(process.env.PORT || 8080);
 
-const bot = new Telegraf('8219536583:AAGjX5otvd0kU0xdzhinLuSBvhD6pkHhx2o');
+ffmpeg.setFfmpegPath(ffmpegPath);
 
-bot.start((ctx) => ctx.reply('🎵 Salom! Musiqani nomi yoki xonandasi bilan yozing, men uni professional formatda topaman!'));
+// Sizning Telegram Tokeningiz
+const TOKEN = "8219536583:AAGjX5otvd0kU0xdzhinLuSBvhD6pkHhx2o";
+const bot = new Telegraf(TOKEN);
 
-bot.on('text', async (ctx) => {
-    const query = ctx.message.text;
-    const msg = await ctx.reply('🔎 Qidirilmoqda...');
-    
+bot.start((ctx) => {
+    ctx.reply("🎵 Qo‘shiq nomini yozing — MP3 qilib beraman!");
+});
+
+bot.on("text", async (ctx) => {
     try {
-        // Dunyo bo'yicha eng barqaror musiqa API
-        const response = await axios.get(`https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}`);
-        
-        if (response.data.success && response.data.data.results.length > 0) {
-            const song = response.data.data.results[0];
-            
-            // Eng yuqori sifatli audio havolasini tanlash
-            const downloadUrl = song.downloadUrl[song.downloadUrl.length - 1].url;
+        const text = ctx.message.text;
+        const msg = await ctx.reply("🔎 Qidirilyapti...");
 
-            // "Yuklanmoqda" deb xabarni yangilash (xatosiz)
-            try { await ctx.editMessageText('📤 Yuklanmoqda...'); } catch (e) {}
+        const search = await yts(text);
 
-            await ctx.replyWithAudio(
-                { url: downloadUrl }, 
-                { 
-                    title: song.name, // Qo'shiq nomi
-                    performer: song.artists.primary[0].name, // Artist nomi
-                    caption: `🎵 **${song.artists.primary[0].name} - ${song.name}**\n\n✅ Toʻliq va sifatli!\n📡 @sammusiqalar`,
-                    parse_mode: 'Markdown'
-                }
-            );
-            
-            return ctx.deleteMessage(msg.message_id).catch(() => {});
+        if (!search.videos.length) {
+            return ctx.reply("❌ Qo‘shiq topilmadi");
         }
 
-        ctx.reply('😕 Kechirasiz, bunday qoʻshiq topilmadi. Iltimos, boshqa nom yozib koʻring.');
+        const video = search.videos[0];
+        // Artist va nomini ajratib olishga harakat qilamiz
+        const titleParts = video.title.split('-');
+        const performer = titleParts.length > 1 ? titleParts[0].trim() : video.author.name;
+        const songName = titleParts.length > 1 ? titleParts[1].trim() : video.title;
+
+        await ctx.editMessageText(`✅ Topildi: ${video.title}\n📥 Yuklanmoqda...`);
+
+        const file = `music_${Date.now()}.mp3`;
+        const stream = ytdl(video.url, {
+            quality: "highestaudio",
+            filter: "audioonly"
+        });
+
+        await new Promise((resolve, reject) => {
+            ffmpeg(stream)
+                .audioBitrate(128)
+                .format("mp3")
+                .save(file)
+                .on("end", resolve)
+                .on("error", reject);
+        });
+
+        await ctx.replyWithAudio({
+            source: fs.createReadStream(file)
+        }, {
+            title: songName,
+            performer: performer,
+            caption: `✅ **${performer} - ${songName}**\n📡 @sammusiqalar`,
+            parse_mode: 'Markdown'
+        });
+
+        // Xabarlarni tozalash
+        ctx.deleteMessage(msg.message_id).catch(() => {});
+        fs.unlinkSync(file);
+
     } catch (e) {
-        console.log('Xato:', e.message);
-        ctx.reply('⚠️ Tarmoqda uzilish boʻldi. Iltimos, bir ozdan soʻng qayta urinib koʻring.');
+        console.log(e);
+        ctx.reply("⚠️ YouTube cheklovi yoki xatolik. Iltimos, boshqa nom yozib ko‘ring.");
     }
 });
 
 bot.launch();
+console.log("🚀 Bot ishlayapti...");
