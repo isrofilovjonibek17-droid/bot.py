@@ -1,71 +1,78 @@
 import os
 import asyncio
-import logging
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from youtube_search import YoutubeSearch
 import yt_dlp
+from youtube_search import YoutubeSearch
 from flask import Flask
 from threading import Thread
 
-# Bot sozlamalari
-TOKEN = "8219536583:AAFIAF_XHr9q1yk07rCzpraG7FMfR6loN64"
+# --- SOZLAMALAR ---
+TOKEN = "8219536583:AAH0SvNG4ES94u0SIfFa6ibszIxjWeGBF-c"
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# Render uchun kichik server
+# Render uchun kichik veb-server (o'chib qolmasligi uchun)
 app = Flask('')
+
 @app.route('/')
-def home(): return "Bot faol!"
+def home():
+    return "Bot ishlayapti!"
 
-def run(): app.run(host='0.0.0.0', port=8080)
+def run_flask():
+    app.run(host='0.0.0.0', port=8080)
 
-def download_audio(query):
-    results = YoutubeSearch(query, max_results=1).to_dict()
-    if not results: return None
-    
-    video_url = f"https://www.youtube.com{results[0]['url_suffix']}"
-    file_name = "music.mp3"
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'music', # Fayl nomi
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': True
-    }
-    
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([video_url])
-    return results[0]['title']
-
+# --- BOT FUNKSIYALARI ---
 @dp.message(Command("start"))
-async def start(message: types.Message):
+async def start_handler(message: types.Message):
     await message.answer("Salom! Qo'shiq nomini yuboring, men darhol topib beraman. 🎵")
 
-@dp.message(F.text)
-async def search(message: types.Message):
-    msg = await message.answer("Qidirilmoqda... 🔍")
+@dp.message()
+async def search_and_send(message: types.Message):
+    query = message.text
+    wait_msg = await message.answer("Qidirilmoqda... 🔎")
+    
     try:
-        title = download_audio(message.text)
-        if title:
-            audio = types.FSInputFile("music.mp3")
-            await message.answer_audio(audio, caption=f"🎵 {title}")
-            if os.path.exists("music.mp3"): os.remove("music.mp3")
-        else:
-            await message.answer("Hech narsa topilmadi 😔")
+        # YouTube'dan qidirish
+        results = YoutubeSearch(query, max_results=1).to_dict()
+        if not results:
+            await wait_msg.edit_text("Hech narsa topilmadi. 😔")
+            return
+
+        video_url = f"https://www.youtube.com{results[0]['url_suffix']}"
+        file_path = f"{message.from_user.id}.mp3"
+
+        # Yuklab olish sozlamalari
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': file_path,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': True
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
+
+        # MP3 faylni yuborish
+        audio = types.FSInputFile(file_path)
+        await bot.send_audio(chat_id=message.chat.id, audio=audio, caption=f"✅ Topildi: {results[0]['title']}")
+        
+        # Faylni o'chirish (joyni tejash uchun)
+        os.remove(file_path)
+        await wait_msg.delete()
+
     except Exception as e:
-        await message.answer("Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
-    finally:
-        await msg.delete()
+        await wait_msg.edit_text(f"Xatolik yuz berdi: {str(e)}")
 
 async def main():
-    Thread(target=run).start()
+    # Flask-ni alohida oqimda ishga tushirish
+    Thread(target=run_flask).start()
+    # Botni ishga tushirish
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     asyncio.run(main())
